@@ -1,0 +1,16 @@
+{
+  "padding": 1.0,
+  "transition": "Fade",
+  "transition_duration": 0.5,
+  "overlay": false,
+  "remove_audio": true,
+  "music_volume": 20,
+  "watermark": "@Perla_Londres",
+  "watermark_size": "mediano",
+  "watermark_opacity": 47,
+  "output_dir": "G:/Descargass",
+  "json_path": "G:/Descargass/river_universitario_2026-02-18.json",
+  "video1_path": "G:/clipchamp/1T.mp4",
+  "video2_path": "G:/clipchamp/2T.mp4",
+  "music_path": "G:/ComfyUI_windows_portable/ComfyUI/output/audio/ComfyUI_00017_.mp3"
+}
