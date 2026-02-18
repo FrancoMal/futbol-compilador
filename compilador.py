@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
-"""
-⚽ Fútbol Clipper - Compilador
-Genera videos compilados por jugador a partir de timestamps y videos de cada tiempo.
-"""
+# ⚽ Fútbol Clipper - Compilador v1.1
+# Genera videos compilados por jugador a partir de timestamps y videos de cada tiempo.
+
+APP_VERSION = "1.1"
 
 import json
 import os
@@ -173,9 +172,16 @@ class Compiler:
                         if tags:
                             tag_texts = " | ".join(t["text"] for t in tags)
                             label = f"{label}  [{tag_texts}]"
+                            # Use first tag color for text, or white if none
+                            tag_color = tags[0].get("color", "#ffffff").lstrip("#")
+                            # Convert hex to ffmpeg color name or use hex
+                            if len(tag_color) == 6:
+                                tag_color = f"#{tag_color}"
+                        else:
+                            tag_color = "white"
                         escaped = label.replace(":", r"\:")
                         filters.append(
-                            f"drawtext=text='{escaped}':fontsize=36:fontcolor=white:"
+                            f"drawtext=text='{escaped}':fontsize=36:fontcolor={tag_color}:"
                             f"borderw=2:bordercolor=black:x=30:y=30"
                         )
                     if watermark:
@@ -336,7 +342,7 @@ CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "compilad
 class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("⚽ Fútbol Clipper - Compilador")
+        self.title(f"⚽ Fútbol Clipper - Compilador v{APP_VERSION}")
         self.geometry("700x850")
         self.configure(bg=BG)
         self.resizable(False, True)
@@ -490,6 +496,13 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
 
         # ── File selectors ──
         self._label(main, "📁 Archivos", font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(5, 2))
+        
+        # Project buttons row
+        proj_btn_frame = tk.Frame(main, bg=BG)
+        proj_btn_frame.pack(fill="x", pady=(0, 3))
+        self._style_btn(proj_btn_frame, "💾 Guardar proyecto", self._save_project, bg=BG3, width=18).pack(side="left")
+        self._style_btn(proj_btn_frame, "📂 Abrir proyecto", self._open_project, bg=BG3, width=18).pack(side="left", padx=5)
+        
         self._entry_row(main, "JSON:", self.json_path, "Seleccionar...", self._pick_json)
         self._entry_row(main, "1er Tiempo:", self.video1_path, "Seleccionar...", self._pick_v1)
         self._entry_row(main, "2do Tiempo:", self.video2_path, "Seleccionar...", self._pick_v2)
@@ -605,6 +618,152 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
             self.json_path.set(p)
             self.output_dir.set(os.path.dirname(p))
             self._load_json(p)
+
+    def _save_project(self):
+        """Save current project to .fcproj file."""
+        if not self.json_data:
+            messagebox.showwarning("Atención", "No hay datos del proyecto para guardar.")
+            return
+        
+        # Get players with their intervals and tags
+        players_to_save = []
+        for p, var in self.player_vars:
+            players_to_save.append({
+                "name": p["name"],
+                "selected": var.get(),
+                "intervals": p.get("intervals", [])
+            })
+        
+        project_data = {
+            "appVersion": APP_VERSION,
+            "match": self.json_data.get("match", ""),
+            "date": self.json_data.get("date", ""),
+            "players": players_to_save,
+            "config": {
+                "video1": self.video1_path.get(),
+                "video2": self.video2_path.get(),
+                "output_dir": self.output_dir.get(),
+                "padding": self.padding.get(),
+                "transition": self.transition.get(),
+                "transition_duration": self.trans_dur.get(),
+                "overlay": self.overlay.get(),
+                "watermark": self.watermark.get(),
+                "watermark_size": self.wm_size.get(),
+                "watermark_opacity": self.wm_opacity.get(),
+                "music": self.music_path.get(),
+                "music_volume": self.music_vol.get(),
+                "remove_audio": self.remove_audio.get(),
+            }
+        }
+        
+        default_name = sanitize_filename(self.json_data.get("match", "proyecto"))
+        p = filedialog.asksaveasfilename(
+            defaultextension=".fcproj",
+            filetypes=[("Fútbol Clipper Project", "*.fcproj"), ("Todos", "*.*")],
+            initialfile=f"{default_name}.fcproj"
+        )
+        if p:
+            try:
+                with open(p, "w", encoding="utf-8") as f:
+                    json.dump(project_data, f, indent=2, ensure_ascii=False)
+                messagebox.showinfo("Guardado", f"Proyecto guardado:\n{p}")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo guardar el proyecto:\n{e}")
+
+    def _open_project(self):
+        """Open a .fcproj file."""
+        p = filedialog.askopenfilename(
+            filetypes=[("Fútbol Clipper Project", "*.fcproj"), ("Todos", "*.*")]
+        )
+        if not p:
+            return
+        
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                project_data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el proyecto:\n{e}")
+            return
+        
+        # Restore config
+        config = project_data.get("config", {})
+        self.video1_path.set(config.get("video1", ""))
+        self.video2_path.set(config.get("video2", ""))
+        self.output_dir.set(config.get("output_dir", ""))
+        self.padding.set(config.get("padding", 2.0))
+        self.transition.set(config.get("transition", "Fade"))
+        self.trans_dur.set(config.get("transition_duration", 0.5))
+        self.overlay.set(config.get("overlay", True))
+        self.watermark.set(config.get("watermark", ""))
+        self.wm_size.set(config.get("watermark_size", "mediano"))
+        self.wm_opacity.set(config.get("watermark_opacity", 70))
+        self.music_path.set(config.get("music", ""))
+        self.music_vol.set(config.get("music_volume", 20))
+        self.remove_audio.set(config.get("remove_audio", False))
+        
+        # Restore JSON data structure
+        self.json_data = {
+            "match": project_data.get("match", ""),
+            "date": project_data.get("date", ""),
+            "players": []
+        }
+        
+        # Restore players
+        for p_data in project_data.get("players", []):
+            player_entry = {
+                "name": p_data["name"],
+                "intervals": p_data.get("intervals", [])
+            }
+            self.json_data["players"].append(player_entry)
+        
+        # Rebuild UI
+        self._build_players_list(project_data.get("players", []))
+        
+        messagebox.showinfo("Cargado", f"Proyecto cargado:\n{p}")
+
+    def _build_players_list(self, players_data):
+        """Build players list UI from loaded project data."""
+        # Clear players frame
+        for w in self.players_frame.winfo_children():
+            w.destroy()
+        self.player_vars.clear()
+        
+        if not players_data:
+            self._label(self.players_frame, "No se encontraron jugadores", fg=RED).pack()
+            return
+        
+        # Select all button
+        btn_frame = tk.Frame(self.players_frame, bg=BG2)
+        btn_frame.pack(fill="x", pady=(0, 5))
+        self._style_btn(btn_frame, "Seleccionar todos", self._select_all).pack(side="left")
+        self._style_btn(btn_frame, "Deseleccionar todos", self._deselect_all).pack(side="left", padx=5)
+        
+        for p_data in players_data:
+            p = {"name": p_data["name"], "intervals": p_data.get("intervals", [])}
+            # Ensure tags exist
+            for iv in p.get("intervals", []):
+                if "tags" not in iv:
+                    iv["tags"] = []
+            
+            var = tk.BooleanVar(value=p_data.get("selected", True))
+            clips = len(p.get("intervals", []))
+            row = tk.Frame(self.players_frame, bg=BG2)
+            row.pack(fill="x", anchor="w")
+            cb = tk.Checkbutton(
+                row,
+                text=f"{p['name']} ({clips} clips)",
+                variable=var, bg=BG2, fg=FG, selectcolor=BG3,
+                activebackground=BG2, activeforeground=FG,
+                font=("Segoe UI", 10)
+            )
+            cb.pack(side="left")
+            edit_btn = tk.Button(
+                row, text="✏️", command=lambda pl=p, cb_w=cb: self._edit_timestamps(pl, cb_w),
+                bg=BG2, fg=ACCENT, activebackground=BG3, activeforeground=ACCENT,
+                relief="flat", font=("Segoe UI", 10), cursor="hand2", padx=4, pady=0, bd=0
+            )
+            edit_btn.pack(side="left", padx=(4, 0))
+            self.player_vars.append((p, var))
 
     def _pick_v1(self):
         p = filedialog.askopenfilename(filetypes=[("Video", "*.mp4 *.mkv *.avi *.mov"), ("Todos", "*.*")])
@@ -1195,5 +1354,6 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
 
 
 if __name__ == "__main__":
+    print(f"⚽ Fútbol Clipper - Compilador v{APP_VERSION}")
     app = App()
     app.mainloop()
