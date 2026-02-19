@@ -1,16 +1,20 @@
 {
   "padding": 1.0,
-  "transition": "Fade",
+  "transition": "Ninguna",
   "transition_duration": 0.5,
   "overlay": false,
   "remove_audio": true,
-  "music_volume": 20,
+  "music_volume": 34,
   "watermark": "@Perla_Londres",
   "watermark_size": "mediano",
   "watermark_opacity": 47,
-  "output_dir": "G:/Descargass",
+  "output_dir": "G:/clipchamp",
   "json_path": "G:/Descargass/river_universitario_2026-02-18.json",
   "video1_path": "G:/clipchamp/1T.mp4",
   "video2_path": "G:/clipchamp/2T.mp4",
-  "music_path": "G:/ComfyUI_windows_portable/ComfyUI/output/audio/ComfyUI_00017_.mp3"
+  "music_path": "G:/ComfyUI_windows_portable/ComfyUI/output/audio/ComfyUI_00017_.mp3",
+  "modo_archivo": "1completo",
+  "minuto_inicio_1t": "06:04",
+  "minuto_inicio_2t": "54:36",
+  "video_full_path": "G:/YouTubeDownloader/output/River 1-0 Universitario 2⧸04⧸2025.mp4"
 }

@@ -131,9 +131,21 @@ class Compiler:
         music = cfg["music"]
         music_vol = cfg["music_volume"] / 100.0
         remove_audio = cfg.get("remove_audio", False)
-
-        dur1 = get_video_duration(vid1)
-        dur2 = get_video_duration(vid2)
+        
+        # Modo partido completo
+        modo_archivo = cfg.get("modo_archivo", "2archivos")
+        video_full = cfg.get("video_full", "")
+        minuto_inicio_1t = cfg.get("minuto_inicio_1t", 0)
+        minuto_inicio_2t = cfg.get("minuto_inicio_2t", 45)
+        
+        # Calcular duraciones de videos
+        if modo_archivo == "1completo" and video_full and os.path.isfile(video_full):
+            dur_full = get_video_duration(video_full)
+            dur1 = dur_full  # No se usa directamente, pero por compatibilidad
+            dur2 = dur_full
+        else:
+            dur1 = get_video_duration(vid1)
+            dur2 = get_video_duration(vid2)
 
         total_players = len(players)
         tmpdir = tempfile.mkdtemp(prefix="futclip_")
@@ -154,11 +166,39 @@ class Compiler:
                                      (pi * total_clips + ci) / (total_players * total_clips))
 
                     half = iv["half"]
-                    vid = vid1 if half == 1 else vid2
-                    dur = dur1 if half == 1 else dur2
-                    start = max(0, ts_to_seconds(iv["start"]) - padding)
-                    end = min(dur, ts_to_seconds(iv["end"]) + padding) if dur > 0 else ts_to_seconds(iv["end"]) + padding
-                    clip_dur = end - start
+                    
+                    # Determinar video de origen según modo
+                    if modo_archivo == "1completo" and video_full and os.path.isfile(video_full):
+                        # Modo partido completo: usar un solo video
+                        vid = video_full
+                        dur = dur_full
+                        
+                        # Calcular timestamps reales en el video completo
+                        if half == 1:
+                            # 1T: el timestamp start/end está en minutos relativos al inicio del 1T
+                            # Agregar minuto_inicio_1t para obtener el minuto real del video
+                            offset_segundos = minuto_inicio_1t  # Ya viene en segundos
+                        else:
+                            # 2T: el timestamp start/end está en minutos relativos al inicio del 2T
+                            # Agregar minuto_inicio_2t para obtener el minuto real del video
+                            offset_segundos = minuto_inicio_2t  # Ya viene en segundos
+                        
+                        # Convertir minutos a segundos y agregar el offset
+                        start_ts_seconds = ts_to_seconds(iv["start"])
+                        end_ts_seconds = ts_to_seconds(iv["end"])
+                        
+                        # Los timestamps del JSON son relativos al tiempo (0:00 = inicio del periodo)
+                        # offset_segundos ya viene en segundos
+                        start = max(0, offset_segundos + start_ts_seconds - padding)
+                        end = min(dur, offset_segundos + end_ts_seconds + padding) if dur > 0 else offset_segundos + end_ts_seconds + padding
+                        clip_dur = end - start
+                    else:
+                        # Modo 2 archivos (original)
+                        vid = vid1 if half == 1 else vid2
+                        dur = dur1 if half == 1 else dur2
+                        start = max(0, ts_to_seconds(iv["start"]) - padding)
+                        end = min(dur, ts_to_seconds(iv["end"]) + padding) if dur > 0 else ts_to_seconds(iv["end"]) + padding
+                        clip_dur = end - start
 
                     clip_path = os.path.join(tmpdir, f"clip_{pi}_{ci}.mp4")
 
@@ -361,6 +401,12 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.wm_size = tk.StringVar(value="mediano")
         self.wm_opacity = tk.IntVar(value=70)
         self.remove_audio = tk.BooleanVar(value=False)
+        
+        # Modo de archivo: "2archivos" (default) o "1completo"
+        self.modo_archivo = tk.StringVar(value="2archivos")
+        self.minuto_inicio_1t = tk.IntVar(value=0)
+        self.minuto_inicio_2t = tk.IntVar(value=45)
+        self.video_full_path = tk.StringVar()
 
         self.player_vars = []
         self.json_data = None
@@ -378,6 +424,16 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self._save_config()
         self.destroy()
 
+    def _toggle_modo_archivo(self):
+        """Toggle between 2 files mode and 1 full match mode."""
+        modo = self.modo_archivo.get()
+        if modo == "2archivos":
+            self.frame_2archivos.pack(fill="x", expand=True)
+            self.frame_1completo.pack_forget()
+        else:
+            self.frame_2archivos.pack_forget()
+            self.frame_1completo.pack(fill="x", expand=True)
+
     def _save_config(self):
         config = {
             "padding": self.padding.get(),
@@ -394,6 +450,10 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
             "video1_path": self.video1_path.get(),
             "video2_path": self.video2_path.get(),
             "music_path": self.music_path.get(),
+            "modo_archivo": self.modo_archivo.get(),
+            "minuto_inicio_1t": self.minuto_inicio_1t.get(),
+            "minuto_inicio_2t": self.minuto_inicio_2t.get(),
+            "video_full_path": self.video_full_path.get(),
         }
         try:
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
@@ -423,10 +483,16 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         # Restore paths only if files still exist
         for key, var in [("output_dir", self.output_dir), ("music_path", self.music_path),
                          ("json_path", self.json_path), ("video1_path", self.video1_path),
-                         ("video2_path", self.video2_path)]:
+                         ("video2_path", self.video2_path), ("video_full_path", self.video_full_path)]:
             val = config.get(key, "")
             if val and os.path.exists(val):
                 var.set(val)
+
+        # Restore modo archivo settings
+        self.modo_archivo.set(config.get("modo_archivo", "2archivos"))
+        self.minuto_inicio_1t.set(config.get("minuto_inicio_1t", 0))
+        self.minuto_inicio_2t.set(config.get("minuto_inicio_2t", 45))
+        self._toggle_modo_archivo()
 
         # Auto-load JSON if restored
         if self.json_path.get() and os.path.isfile(self.json_path.get()):
@@ -504,9 +570,67 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self._style_btn(proj_btn_frame, "📂 Abrir proyecto", self._open_project, bg=BG3, width=18).pack(side="left", padx=5)
         
         self._entry_row(main, "JSON:", self.json_path, "Seleccionar...", self._pick_json)
-        self._entry_row(main, "1er Tiempo:", self.video1_path, "Seleccionar...", self._pick_v1)
-        self._entry_row(main, "2do Tiempo:", self.video2_path, "Seleccionar...", self._pick_v2)
-        self._entry_row(main, "Carpeta salida:", self.output_dir, "Seleccionar...", self._pick_outdir, is_dir=True)
+        
+        # ── Modo de archivo ──
+        modo_frame = tk.Frame(main, bg=BG)
+        modo_frame.pack(fill="x", pady=(5, 5))
+        self._label(modo_frame, "📹 Archivos de video:").pack(anchor="w")
+        
+        modo_radio_frame = tk.Frame(modo_frame, bg=BG)
+        modo_radio_frame.pack(anchor="w", pady=(2, 5))
+        rb1 = tk.Radiobutton(modo_radio_frame, text="2 archivos (1T y 2T separados)", 
+                             variable=self.modo_archivo, value="2archivos",
+                             bg=BG, fg=FG, selectcolor=BG2, activebackground=BG, activeforeground=FG,
+                             font=("Segoe UI", 10), command=self._toggle_modo_archivo)
+        rb1.pack(side="left", padx=(0, 15))
+        rb2 = tk.Radiobutton(modo_radio_frame, text="1 archivo (partido completo)", 
+                             variable=self.modo_archivo, value="1completo",
+                             bg=BG, fg=FG, selectcolor=BG2, activebackground=BG, activeforeground=FG,
+                             font=("Segoe UI", 10), command=self._toggle_modo_archivo)
+        rb2.pack(side="left")
+        
+        # Frame contenedor para videos - SIEMPRE packeado
+        self.video_container = tk.Frame(main, bg=BG)
+        self.video_container.pack(fill="x")
+        
+        # Frame para modo 2 archivos
+        self.frame_2archivos = tk.Frame(self.video_container, bg=BG)
+        self.frame_2archivos.pack(fill="x", expand=True)
+        self._entry_row(self.frame_2archivos, "1er Tiempo:", self.video1_path, "Seleccionar...", self._pick_v1)
+        self._entry_row(self.frame_2archivos, "2do Tiempo:", self.video2_path, "Seleccionar...", self._pick_v2)
+        
+        # Frame para modo 1 archivo completo
+        self.frame_1completo = tk.Frame(self.video_container, bg=BG)
+        self._entry_row(self.frame_1completo, "Video completo:", self.video_full_path, "Seleccionar...", self._pick_vfull)
+        
+        # Inputs de minutos DENTRO del frame_1completo
+        self.minutos_frame = tk.Frame(self.frame_1completo, bg=BG)
+        
+        # Minuto inicio 1T - formato MM:SS
+        tk.Frame(self.minutos_frame, bg=BG).pack(side="left")  # spacer para alinear con label
+        self._label(self.minutos_frame, "Minuto inicio 1T:").pack(side="left")
+        self.minuto_inicio_1t = tk.StringVar(value="0:00")
+        tk.Entry(self.minutos_frame, textvariable=self.minuto_inicio_1t,
+                 width=8, bg=BG2, fg=FG, font=("Segoe UI", 10), relief="flat").pack(side="left", padx=(5, 15))
+        
+        # Minuto inicio 2T - formato MM:SS
+        self._label(self.minutos_frame, "Minuto inicio 2T:").pack(side="left")
+        self.minuto_inicio_2t = tk.StringVar(value="45:00")
+        tk.Entry(self.minutos_frame, textvariable=self.minuto_inicio_2t,
+                 width=8, bg=BG2, fg=FG, font=("Segoe UI", 10), relief="flat").pack(side="left", padx=5)
+        
+        # Labels de ayuda
+        self._label(self.minutos_frame, "(MM:SS)", font=("Segoe UI", 8), fg=FG2).pack(side="left", padx=(5, 0))
+        
+        self.minutos_frame.pack(fill="x", pady=(5, 0), padx=28)
+        
+        # Ocultar inicialmente frame_1completo
+        self.frame_1completo.pack_forget()
+        
+        # Frame para carpeta de salida
+        self.carpeta_salida_frame = tk.Frame(main, bg=BG)
+        self._entry_row(self.carpeta_salida_frame, "📁 Carpeta salida:", self.output_dir, "Seleccionar...", self._pick_outdir, is_dir=True)
+        self.carpeta_salida_frame.pack(fill="x")
 
         # ── Options ──
         sep = tk.Frame(main, bg=BG3, height=1)
@@ -653,6 +777,10 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
                 "music": self.music_path.get(),
                 "music_volume": self.music_vol.get(),
                 "remove_audio": self.remove_audio.get(),
+                "modo_archivo": self.modo_archivo.get(),
+                "video_full_path": self.video_full_path.get(),
+                "minuto_inicio_1t": self.minuto_inicio_1t.get(),
+                "minuto_inicio_2t": self.minuto_inicio_2t.get(),
             }
         }
         
@@ -700,6 +828,13 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.music_path.set(config.get("music", ""))
         self.music_vol.set(config.get("music_volume", 20))
         self.remove_audio.set(config.get("remove_audio", False))
+        
+        # Restore modo archivo settings
+        self.modo_archivo.set(config.get("modo_archivo", "2archivos"))
+        self.video_full_path.set(config.get("video_full_path", ""))
+        self.minuto_inicio_1t.set(config.get("minuto_inicio_1t", 0))
+        self.minuto_inicio_2t.set(config.get("minuto_inicio_2t", 45))
+        self._toggle_modo_archivo()
         
         # Restore JSON data structure
         self.json_data = {
@@ -774,6 +909,11 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         p = filedialog.askopenfilename(filetypes=[("Video", "*.mp4 *.mkv *.avi *.mov"), ("Todos", "*.*")])
         if p:
             self.video2_path.set(p)
+
+    def _pick_vfull(self):
+        p = filedialog.askopenfilename(filetypes=[("Video", "*.mp4 *.mkv *.avi *.mov"), ("Todos", "*.*")])
+        if p:
+            self.video_full_path.set(p)
 
     def _pick_outdir(self):
         p = filedialog.askdirectory()
@@ -1272,12 +1412,37 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         if not self.json_data:
             messagebox.showwarning("Atención", "Seleccioná un archivo JSON primero.")
             return
-        if not self.video1_path.get() or not os.path.isfile(self.video1_path.get()):
-            messagebox.showwarning("Atención", "Seleccioná el video del 1er tiempo.")
-            return
-        if not self.video2_path.get() or not os.path.isfile(self.video2_path.get()):
-            messagebox.showwarning("Atención", "Seleccioná el video del 2do tiempo.")
-            return
+        
+        modo = self.modo_archivo.get()
+        if modo == "2archivos":
+            # Validación modo 2 archivos
+            if not self.video1_path.get() or not os.path.isfile(self.video1_path.get()):
+                messagebox.showwarning("Atención", "Seleccioná el video del 1er tiempo.")
+                return
+            if not self.video2_path.get() or not os.path.isfile(self.video2_path.get()):
+                messagebox.showwarning("Atención", "Seleccioná el video del 2do tiempo.")
+                return
+        else:
+            # Validación modo 1 archivo completo
+            if not self.video_full_path.get() or not os.path.isfile(self.video_full_path.get()):
+                messagebox.showwarning("Atención", "Seleccioná el video del partido completo.")
+                return
+            
+            # Convertir MM:SS a segundos para validar
+            def parse_time(s):
+                try:
+                    if ":" in s:
+                        parts = s.split(":")
+                        return int(parts[0]) * 60 + int(parts[1])
+                    return int(s)
+                except:
+                    return 0
+            
+            t1 = parse_time(self.minuto_inicio_1t.get())
+            t2 = parse_time(self.minuto_inicio_2t.get())
+            if t2 <= t1:
+                messagebox.showwarning("Atención", "El minuto de inicio del 2T debe ser mayor que el del 1T.")
+                return
 
         # Check ffmpeg
         try:
@@ -1310,7 +1475,27 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
             "music": self.music_path.get(),
             "music_volume": self.music_vol.get(),
             "remove_audio": self.remove_audio.get(),
+            # Nuevos parámetros para modo partido completo
+            "modo_archivo": self.modo_archivo.get(),
+            "video_full": self.video_full_path.get(),
         }
+        
+        # Convertir MM:SS a segundos para modo 1completo
+        def parse_time_to_seconds(s):
+            try:
+                if ":" in s:
+                    parts = s.split(":")
+                    return int(parts[0]) * 60 + int(parts[1])
+                return int(s) * 60  # si no tiene :, assume minutos
+            except:
+                return 0
+        
+        if self.modo_archivo.get() == "1completo":
+            config["minuto_inicio_1t"] = parse_time_to_seconds(self.minuto_inicio_1t.get())
+            config["minuto_inicio_2t"] = parse_time_to_seconds(self.minuto_inicio_2t.get())
+        else:
+            config["minuto_inicio_1t"] = 0
+            config["minuto_inicio_2t"] = 45 * 60  # default 45 minutos en segundos
 
         self._save_config()
 
