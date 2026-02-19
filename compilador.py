@@ -1,7 +1,7 @@
 # ⚽ Fútbol Clipper - Compilador v1.1
 # Genera videos compilados por jugador a partir de timestamps y videos de cada tiempo.
 
-APP_VERSION = "1.1"
+APP_VERSION = "1.2"
 
 import json
 import os
