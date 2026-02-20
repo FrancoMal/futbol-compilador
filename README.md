@@ -100,8 +100,8 @@ Usá [**Fútbol Clipper**](https://francomal.github.io/futbol-clipper/) para mar
     {
       "name": "Enzo Fernández",
       "intervals": [
-        { "start": "12:30", "end": "12:58", "half": 1 },
-        { "start": "05:11", "end": "05:45", "half": 2 }
+        { "start": "12:30", "end": "12:58", "half": 1, "tags": [] },
+        { "start": "05:11", "end": "05:45", "half": 2, "tags": [] }
       ]
     }
   ]
