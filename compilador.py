@@ -231,29 +231,24 @@ class Compiler:
                         fs = sizes.get(wm_size, 32)
                         wm_opacity = cfg.get("watermark_opacity", 70) / 100
                         
-                        # Fuentes: Windows + locales
-                        font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+                        # Fuentes: buscar en carpeta fonts del proyecto
+                        base_dir = os.path.dirname(os.path.abspath(__file__))
+                        font_dir = os.path.join(base_dir, "fonts")
                         font_map = {
-                            "Segoe UI": "C\\:/Windows/Fonts/segoeui.ttf",
-                            "Arial": "C\\:/Windows/Fonts/arial.ttf",
-                            "Verdana": "C\\:/Windows/Fonts/verdana.ttf",
-                            "Tahoma": "C\\:/Windows/Fonts/tahoma.ttf",
-                            "Georgia": "C\\:/Windows/Fonts/georgia.ttf",
-                            "Impact": "C\\:/Windows/Fonts/impact.ttf",
+                            "Segoe UI": "",  # Sistema
+                            "Arial": "",     # Sistema
+                            "Verdana": "",   # Sistema
+                            "Tahoma": "",    # Sistema
+                            "Georgia": "",   # Sistema
+                            "Impact": "",    # Sistema
                             "Inter": os.path.join(font_dir, "inter", "extras", "ttf", "Inter-Regular.ttf"),
                             "Core Sans": os.path.join(font_dir, "CoreSansA45Regular.otf"),
                         }
                         fontfile = font_map.get(wm_font, "")
                         
-                        # Buscar fuente en ruta absoluta o relativa
-                        if fontfile:
-                            if not os.path.isabs(fontfile):
-                                # Ruta relativa: buscar desde la ubicación del script
-                                fontfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", fontfile)
-                            if os.path.exists(fontfile):
-                                font_str = f"fontfile='{fontfile}':"
-                            else:
-                                font_str = ""
+                        # Si es fuente del sistema, no usar fontfile
+                        if fontfile and os.path.exists(fontfile):
+                            font_str = f"fontfile='{fontfile}':"
                         else:
                             font_str = ""
                         
