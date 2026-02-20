@@ -1,0 +1,6 @@
+# Fútbol Clipper - Compilador dependencies
+# Install with: pip install -r requirements.txt
+
+pillow>=10.0.0
+tkinterdnd2>=0.4.0
+mutagen>=1.47.0
