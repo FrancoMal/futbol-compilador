@@ -12,7 +12,7 @@ Herramienta para crear compilados de video de jugadores de fútbol. Toma timesta
 
 - **GUI amigable** — Interfaz gráfica completa, no necesita terminal
 - **Importa timestamps desde JSON** — Exportados de [Fútbol Clipper](https://francomal.github.io/futbol-clipper/) webapp
-- **Videos por tiempo** — Soporta videos separados de primer y segundo tiempo
+- **Videos por tiempo** — Soporta videos separados de primer y segundo tiempo, o un solo video completo con minuto de inicio configurable
 - **Padding configurable** — Segundos extra antes/después de cada clip
 - **Transiciones entre clips** — Ninguna, Fade o CrossFade
 - **Overlay de minuto** — Muestra el minuto del partido en cada clip (ej: "1T 12:30")
@@ -33,6 +33,17 @@ Herramienta para crear compilados de video de jugadores de fútbol. Toma timesta
 
 - **Windows 10/11**
 - **FFmpeg** instalado y en PATH — [Descargar FFmpeg](https://ffmpeg.org/download.html)
+
+### Para ejecutar con Python (Opción B)
+
+```bash
+pip install -r requirements.txt
+```
+
+Dependencias:
+- `pillow` — Procesamiento de imágenes
+- `tkinterdnd2` — Drag & drop en la interfaz
+- `mutagen` — Lectura de metadatos de audio
 
 ---
 
