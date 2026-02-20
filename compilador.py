@@ -127,7 +127,8 @@ class Compiler:
         trans_dur = cfg["transition_duration"]
         overlay = cfg["overlay"]
         watermark = cfg["watermark"].strip()
-        wm_size = cfg["watermark_size"]
+        wm_size = cfg.get("watermark_size", "mediano")
+        wm_font = cfg.get("watermark_font", "Segoe UI")
         music = cfg["music"]
         music_vol = cfg["music_volume"] / 100.0
         remove_audio = cfg.get("remove_audio", False)
@@ -229,8 +230,26 @@ class Compiler:
                         sizes = {"pequeño": 24, "mediano": 32, "grande": 48}
                         fs = sizes.get(wm_size, 32)
                         wm_opacity = cfg.get("watermark_opacity", 70) / 100
+                        
+                        # Fuentes del sistema Windows - mapear nombres a rutas
+                        font_map = {
+                            "Segoe UI": "C\\:/Windows/Fonts/segoeui.ttf",
+                            "Arial": "C\\:/Windows/Fonts/arial.ttf",
+                            "Roboto": "C\\:/Windows/Fonts/roboto.ttf",
+                            "Open Sans": "C\\:/Windows/Fonts/opensans.ttf",
+                            "Core Sans": "C\\:/Windows/Fonts/coresans.ttf",
+                            "Montserrat": "C\\:/Windows/Fonts/montserrat.ttf",
+                            "Poppins": "C\\:/Windows/Fonts/poppins.ttf",
+                        }
+                        fontfile = font_map.get(wm_font, "")
+                        
+                        if fontfile and os.path.exists(fontfile.replace("\\", "/").replace("C\\:/", "C:/")):
+                            font_str = f"fontfile='{fontfile}':"
+                        else:
+                            font_str = ""
+                        
                         filters.append(
-                            f"drawtext=text='{wm_escaped}':fontsize={fs}:fontcolor=white@{wm_opacity:.2f}:"
+                            f"drawtext=text='{wm_escaped}':{font_str}fontsize={fs}:fontcolor=white@{wm_opacity:.2f}:"
                             f"borderw=2:bordercolor=black@{wm_opacity:.2f}:x=(w-text_w)/2:y=h-th-20"
                         )
 
@@ -399,6 +418,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.music_vol = tk.IntVar(value=20)
         self.watermark = tk.StringVar()
         self.wm_size = tk.StringVar(value="mediano")
+        self.wm_font = tk.StringVar(value="Segoe UI")
         self.wm_opacity = tk.IntVar(value=70)
         self.remove_audio = tk.BooleanVar(value=False)
         
@@ -444,6 +464,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
             "music_volume": self.music_vol.get(),
             "watermark": self.watermark.get(),
             "watermark_size": self.wm_size.get(),
+            "watermark_font": self.wm_font.get(),
             "watermark_opacity": self.wm_opacity.get(),
             "output_dir": self.output_dir.get(),
             "json_path": self.json_path.get(),
@@ -478,6 +499,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.music_vol.set(config.get("music_volume", 20))
         self.watermark.set(config.get("watermark", ""))
         self.wm_size.set(config.get("watermark_size", "mediano"))
+        self.wm_font.set(config.get("watermark_font", "Segoe UI"))
         self.wm_opacity.set(config.get("watermark_opacity", 70))
 
         # Restore paths only if files still exist
@@ -666,13 +688,16 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         r3.pack(fill="x", pady=2)
         self._label(r3, "Marca de agua:").pack(side="left")
         tk.Entry(r3, textvariable=self.watermark, bg=BG2, fg=FG, insertbackground=FG,
-                 relief="flat", font=("Segoe UI", 9), width=25).pack(side="left", padx=5)
-        self._label(r3, "Tamaño:").pack(side="left", padx=(10, 0))
+                 relief="flat", font=("Segoe UI", 9), width=18).pack(side="left", padx=5)
+        self._label(r3, "Fuente:").pack(side="left", padx=(5, 0))
+        ttk.Combobox(r3, textvariable=self.wm_font, values=["Segoe UI", "Arial", "Roboto", "Open Sans", "Core Sans", "Montserrat", "Poppins"],
+                     width=10, state="readonly").pack(side="left", padx=3)
+        self._label(r3, "Tamaño:").pack(side="left", padx=(5, 0))
         ttk.Combobox(r3, textvariable=self.wm_size, values=["pequeño", "mediano", "grande"],
-                     width=10, state="readonly").pack(side="left", padx=5)
-        self._label(r3, "Opacidad:").pack(side="left", padx=(10, 0))
+                     width=8, state="readonly").pack(side="left", padx=3)
+        self._label(r3, "Opacidad:").pack(side="left", padx=(5, 0))
         tk.Scale(r3, variable=self.wm_opacity, from_=10, to=100, orient="horizontal",
-                 bg=BG, fg=FG, troughcolor=BG2, highlightthickness=0, length=80,
+                 bg=BG, fg=FG, troughcolor=BG2, highlightthickness=0, length=60,
                  showvalue=False, sliderlength=12).pack(side="left", padx=2)
         self.wm_opacity_label = self._label(r3, "70%", font=("Segoe UI", 9))
         self.wm_opacity_label.pack(side="left")
@@ -773,6 +798,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
                 "overlay": self.overlay.get(),
                 "watermark": self.watermark.get(),
                 "watermark_size": self.wm_size.get(),
+                "watermark_font": self.wm_font.get(),
                 "watermark_opacity": self.wm_opacity.get(),
                 "music": self.music_path.get(),
                 "music_volume": self.music_vol.get(),
@@ -824,6 +850,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.overlay.set(config.get("overlay", True))
         self.watermark.set(config.get("watermark", ""))
         self.wm_size.set(config.get("watermark_size", "mediano"))
+        self.wm_font.set(config.get("watermark_font", "Segoe UI"))
         self.wm_opacity.set(config.get("watermark_opacity", 70))
         self.music_path.set(config.get("music", ""))
         self.music_vol.set(config.get("music_volume", 20))
@@ -1471,6 +1498,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
             "overlay": self.overlay.get(),
             "watermark": self.watermark.get(),
             "watermark_size": self.wm_size.get(),
+            "watermark_font": self.wm_font.get(),
             "watermark_opacity": self.wm_opacity.get(),
             "music": self.music_path.get(),
             "music_volume": self.music_vol.get(),
