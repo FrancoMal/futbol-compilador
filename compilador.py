@@ -1,7 +1,7 @@
 # ⚽ Fútbol Clipper - Compilador v1.1
 # Genera videos compilados por jugador a partir de timestamps y videos de cada tiempo.
 
-APP_VERSION = "1.2"
+APP_VERSION = "1.3"
 
 import json
 import os
@@ -129,6 +129,8 @@ class Compiler:
         watermark = cfg["watermark"].strip()
         wm_size = cfg.get("watermark_size", "mediano")
         wm_font = cfg.get("watermark_font", "Segoe UI")
+        wm_bold = cfg.get("watermark_bold", False)
+        wm_italic = cfg.get("watermark_italic", False)
         music = cfg["music"]
         music_vol = cfg["music_volume"] / 100.0
         remove_audio = cfg.get("remove_audio", False)
@@ -231,9 +233,17 @@ class Compiler:
                         fs = sizes.get(wm_size, 32)
                         wm_opacity = cfg.get("watermark_opacity", 70) / 100
                         
-                        # Fuentes: buscar en carpeta fonts del proyecto
-                        base_dir = os.path.dirname(os.path.abspath(__file__))
+                        # Fuentes: buscar en carpeta fonts (funciona en exe y Python)
+                        import sys
+                        if getattr(sys, 'frozen', False):
+                            # Ejecutando como exe
+                            base_dir = sys._MEIPASS
+                        else:
+                            # Ejecutando como Python
+                            base_dir = os.path.dirname(os.path.abspath(__file__))
+                        
                         font_dir = os.path.join(base_dir, "fonts")
+                        
                         font_map = {
                             "Segoe UI": "",  # Sistema
                             "Arial": "",     # Sistema
@@ -241,19 +251,52 @@ class Compiler:
                             "Tahoma": "",    # Sistema
                             "Georgia": "",   # Sistema
                             "Impact": "",    # Sistema
-                            "Inter": os.path.join(font_dir, "inter", "extras", "ttf", "Inter-Regular.ttf"),
-                            "Core Sans": os.path.join(font_dir, "CoreSansA45Regular.otf"),
+                            "Inter": {
+                                "regular": os.path.join(font_dir, "inter", "extras", "ttf", "Inter-Regular.ttf"),
+                                "bold": os.path.join(font_dir, "inter", "extras", "ttf", "Inter-Bold.ttf"),
+                                "italic": os.path.join(font_dir, "inter", "extras", "ttf", "Inter-Italic.ttf"),
+                                "bold_italic": os.path.join(font_dir, "inter", "extras", "ttf", "Inter-BoldItalic.ttf"),
+                            },
+                            "Core Sans": {
+                                "regular": os.path.join(font_dir, "CoreSansA45Regular.otf"),
+                                "bold": os.path.join(font_dir, "CoreSansA65Bold.otf"),
+                                "italic": "",  # No existe
+                                "bold_italic": "",
+                            },
                         }
-                        fontfile = font_map.get(wm_font, "")
                         
-                        # Si es fuente del sistema, no usar fontfile
+                        # Determinar qué archivo de fuente usar según bold/italic
+                        fontfile = ""
+                        if wm_font in font_map:
+                            if isinstance(font_map[wm_font], dict):
+                                # Fuente con variantes
+                                if wm_bold and wm_italic:
+                                    fontfile = font_map[wm_font].get("bold_italic", "")
+                                elif wm_bold:
+                                    fontfile = font_map[wm_font].get("bold", "")
+                                elif wm_italic:
+                                    fontfile = font_map[wm_font].get("italic", "")
+                                if not fontfile:
+                                    fontfile = font_map[wm_font].get("regular", "")
+                            else:
+                                fontfile = font_map[wm_font]
+                        
+                        # Si es fuente del sistema (string vacío), no usar fontfile
                         if fontfile and os.path.exists(fontfile):
-                            font_str = f"fontfile='{fontfile}':"
+                            font_escaped = fontfile.replace("\\", "\\\\")
+                            font_str = f"fontfile='{font_escaped}':"
                         else:
                             font_str = ""
                         
+                        # Estilo para fuentes del sistema
+                        style_str = ""
+                        if not fontfile and wm_bold:
+                            style_str += "bold=1:"
+                        if not fontfile and wm_italic:
+                            style_str += "italic=1:"
+                        
                         filters.append(
-                            f"drawtext=text='{wm_escaped}':{font_str}fontsize={fs}:fontcolor=white@{wm_opacity:.2f}:"
+                            f"drawtext=text='{wm_escaped}':{font_str}{style_str}fontsize={fs}:fontcolor=white@{wm_opacity:.2f}:"
                             f"borderw=2:bordercolor=black@{wm_opacity:.2f}:x=(w-text_w)/2:y=h-th-20"
                         )
 
@@ -423,6 +466,8 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.watermark = tk.StringVar()
         self.wm_size = tk.StringVar(value="mediano")
         self.wm_font = tk.StringVar(value="Segoe UI")
+        self.wm_bold = tk.BooleanVar(value=False)
+        self.wm_italic = tk.BooleanVar(value=False)
         self.wm_opacity = tk.IntVar(value=70)
         self.remove_audio = tk.BooleanVar(value=False)
         
@@ -469,6 +514,8 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
             "watermark": self.watermark.get(),
             "watermark_size": self.wm_size.get(),
             "watermark_font": self.wm_font.get(),
+            "watermark_bold": self.wm_bold.get(),
+            "watermark_italic": self.wm_italic.get(),
             "watermark_opacity": self.wm_opacity.get(),
             "output_dir": self.output_dir.get(),
             "json_path": self.json_path.get(),
@@ -504,6 +551,8 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.watermark.set(config.get("watermark", ""))
         self.wm_size.set(config.get("watermark_size", "mediano"))
         self.wm_font.set(config.get("watermark_font", "Segoe UI"))
+        self.wm_bold.set(config.get("watermark_bold", False))
+        self.wm_italic.set(config.get("watermark_italic", False))
         self.wm_opacity.set(config.get("watermark_opacity", 70))
 
         # Restore paths only if files still exist
@@ -692,14 +741,18 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         r3.pack(fill="x", pady=2)
         self._label(r3, "Marca de agua:").pack(side="left")
         tk.Entry(r3, textvariable=self.watermark, bg=BG2, fg=FG, insertbackground=FG,
-                 relief="flat", font=("Segoe UI", 9), width=18).pack(side="left", padx=5)
-        self._label(r3, "Fuente:").pack(side="left", padx=(5, 0))
-        ttk.Combobox(r3, textvariable=self.wm_font, values=["Segoe UI", "Arial", "Inter", "Core Sans", "Verdana", "Tahoma", "Georgia", "Impact"],
-                     width=10, state="readonly").pack(side="left", padx=3)
-        self._label(r3, "Tamaño:").pack(side="left", padx=(5, 0))
+                 relief="flat", font=("Segoe UI", 9), width=12).pack(side="left", padx=5)
+        self._label(r3, "Fuente:").pack(side="left", padx=(2, 0))
+        ttk.Combobox(r3, textvariable=self.wm_font, values=["Segoe UI", "Arial", "Inter", "Core Sans"],
+                     width=8, state="readonly").pack(side="left", padx=2)
+        tk.Checkbutton(r3, text="B", variable=self.wm_bold, width=2, bg=BG, fg=FG, selectcolor=BG2,
+                      activebackground=BG, font=("Segoe UI", 9, "bold")).pack(side="left", padx=0)
+        tk.Checkbutton(r3, text="I", variable=self.wm_italic, width=2, bg=BG, fg=FG, selectcolor=BG2,
+                      activebackground=BG, font=("Segoe UI", 9, "italic")).pack(side="left", padx=0)
+        self._label(r3, "Tamaño:").pack(side="left", padx=(3, 0))
         ttk.Combobox(r3, textvariable=self.wm_size, values=["pequeño", "mediano", "grande"],
-                     width=8, state="readonly").pack(side="left", padx=3)
-        self._label(r3, "Opacidad:").pack(side="left", padx=(5, 0))
+                     width=7, state="readonly").pack(side="left", padx=2)
+        self._label(r3, "Opacidad:").pack(side="left", padx=(3, 0))
         tk.Scale(r3, variable=self.wm_opacity, from_=10, to=100, orient="horizontal",
                  bg=BG, fg=FG, troughcolor=BG2, highlightthickness=0, length=60,
                  showvalue=False, sliderlength=12).pack(side="left", padx=2)
@@ -803,6 +856,8 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
                 "watermark": self.watermark.get(),
                 "watermark_size": self.wm_size.get(),
                 "watermark_font": self.wm_font.get(),
+                "watermark_bold": self.wm_bold.get(),
+                "watermark_italic": self.wm_italic.get(),
                 "watermark_opacity": self.wm_opacity.get(),
                 "music": self.music_path.get(),
                 "music_volume": self.music_vol.get(),
@@ -855,6 +910,8 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         self.watermark.set(config.get("watermark", ""))
         self.wm_size.set(config.get("watermark_size", "mediano"))
         self.wm_font.set(config.get("watermark_font", "Segoe UI"))
+        self.wm_bold.set(config.get("watermark_bold", False))
+        self.wm_italic.set(config.get("watermark_italic", False))
         self.wm_opacity.set(config.get("watermark_opacity", 70))
         self.music_path.set(config.get("music", ""))
         self.music_vol.set(config.get("music_volume", 20))
@@ -1503,6 +1560,8 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
             "watermark": self.watermark.get(),
             "watermark_size": self.wm_size.get(),
             "watermark_font": self.wm_font.get(),
+            "watermark_bold": self.wm_bold.get(),
+            "watermark_italic": self.wm_italic.get(),
             "watermark_opacity": self.wm_opacity.get(),
             "music": self.music_path.get(),
             "music_volume": self.music_vol.get(),
