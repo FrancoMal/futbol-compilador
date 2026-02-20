@@ -232,6 +232,7 @@ class Compiler:
                         wm_opacity = cfg.get("watermark_opacity", 70) / 100
                         
                         # Fuentes: Windows + locales
+                        font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
                         font_map = {
                             "Segoe UI": "C\\:/Windows/Fonts/segoeui.ttf",
                             "Arial": "C\\:/Windows/Fonts/arial.ttf",
@@ -239,12 +240,20 @@ class Compiler:
                             "Tahoma": "C\\:/Windows/Fonts/tahoma.ttf",
                             "Georgia": "C\\:/Windows/Fonts/georgia.ttf",
                             "Impact": "C\\:/Windows/Fonts/impact.ttf",
-                            "Inter": "C\\:/Users/Usuario/clawd/projects/futbol-compilador/fonts/inter/extras/ttf/Inter-Regular.ttf",
+                            "Inter": os.path.join(font_dir, "inter", "extras", "ttf", "Inter-Regular.ttf"),
+                            "Core Sans": os.path.join(font_dir, "CoreSansA45Regular.otf"),
                         }
                         fontfile = font_map.get(wm_font, "")
                         
-                        if fontfile and os.path.exists(fontfile.replace("\\", "/").replace("C\\:/", "C:/")):
-                            font_str = f"fontfile='{fontfile}':"
+                        # Buscar fuente en ruta absoluta o relativa
+                        if fontfile:
+                            if not os.path.isabs(fontfile):
+                                # Ruta relativa: buscar desde la ubicación del script
+                                fontfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", fontfile)
+                            if os.path.exists(fontfile):
+                                font_str = f"fontfile='{fontfile}':"
+                            else:
+                                font_str = ""
                         else:
                             font_str = ""
                         
@@ -690,7 +699,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         tk.Entry(r3, textvariable=self.watermark, bg=BG2, fg=FG, insertbackground=FG,
                  relief="flat", font=("Segoe UI", 9), width=18).pack(side="left", padx=5)
         self._label(r3, "Fuente:").pack(side="left", padx=(5, 0))
-        ttk.Combobox(r3, textvariable=self.wm_font, values=["Segoe UI", "Arial", "Inter", "Verdana", "Tahoma", "Georgia", "Impact"],
+        ttk.Combobox(r3, textvariable=self.wm_font, values=["Segoe UI", "Arial", "Inter", "Core Sans", "Verdana", "Tahoma", "Georgia", "Impact"],
                      width=10, state="readonly").pack(side="left", padx=3)
         self._label(r3, "Tamaño:").pack(side="left", padx=(5, 0))
         ttk.Combobox(r3, textvariable=self.wm_size, values=["pequeño", "mediano", "grande"],
