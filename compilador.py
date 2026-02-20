@@ -231,15 +231,14 @@ class Compiler:
                         fs = sizes.get(wm_size, 32)
                         wm_opacity = cfg.get("watermark_opacity", 70) / 100
                         
-                        # Fuentes del sistema Windows - mapear nombres a rutas
+                        # Fuentes del sistema Windows
                         font_map = {
                             "Segoe UI": "C\\:/Windows/Fonts/segoeui.ttf",
                             "Arial": "C\\:/Windows/Fonts/arial.ttf",
-                            "Roboto": "C\\:/Windows/Fonts/roboto.ttf",
-                            "Open Sans": "C\\:/Windows/Fonts/opensans.ttf",
-                            "Core Sans": "C\\:/Windows/Fonts/coresans.ttf",
-                            "Montserrat": "C\\:/Windows/Fonts/montserrat.ttf",
-                            "Poppins": "C\\:/Windows/Fonts/poppins.ttf",
+                            "Verdana": "C\\:/Windows/Fonts/verdana.ttf",
+                            "Tahoma": "C\\:/Windows/Fonts/tahoma.ttf",
+                            "Georgia": "C\\:/Windows/Fonts/georgia.ttf",
+                            "Impact": "C\\:/Windows/Fonts/impact.ttf",
                         }
                         fontfile = font_map.get(wm_font, "")
                         
@@ -690,7 +689,7 @@ class App(TkinterDnD.Tk if HAS_DND else tk.Tk):
         tk.Entry(r3, textvariable=self.watermark, bg=BG2, fg=FG, insertbackground=FG,
                  relief="flat", font=("Segoe UI", 9), width=18).pack(side="left", padx=5)
         self._label(r3, "Fuente:").pack(side="left", padx=(5, 0))
-        ttk.Combobox(r3, textvariable=self.wm_font, values=["Segoe UI", "Arial", "Roboto", "Open Sans", "Core Sans", "Montserrat", "Poppins"],
+        ttk.Combobox(r3, textvariable=self.wm_font, values=["Segoe UI", "Arial", "Verdana", "Tahoma", "Georgia", "Impact"],
                      width=10, state="readonly").pack(side="left", padx=3)
         self._label(r3, "Tamaño:").pack(side="left", padx=(5, 0))
         ttk.Combobox(r3, textvariable=self.wm_size, values=["pequeño", "mediano", "grande"],
